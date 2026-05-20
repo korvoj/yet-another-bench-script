@@ -279,6 +279,17 @@ DISTRO=$(grep 'PRETTY_NAME' /etc/os-release | cut -d '"' -f 2 )
 echo -e "Distro     : $DISTRO"
 KERNEL=$(uname -r)
 echo -e "Kernel     : $KERNEL"
+HOSTNAME=$(hostname)
+if [[ -f /etc/machine-id ]]; then
+	MACHINE_ID=$(awk 'NF {print; exit}' /etc/machine-id)
+fi
+if [[ -n "$MACHINE_ID" ]]; then
+	UNIQUE_ID=$(printf "%s" "$MACHINE_ID" | sha256sum | awk '{print $1}')
+else
+	CPU_ID=$(awk -F: '/^model name[ \t]*:/ {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}' /proc/cpuinfo)
+	[[ -z "$CPU_ID" ]] && CPU_ID="$CPU_PROC"
+	UNIQUE_ID=$(printf "%s%s" "$HOSTNAME" "$CPU_ID" | sha256sum | awk '{print $1}')
+fi
 VIRT=$(systemd-detect-virt 2>/dev/null)
 VIRT=${VIRT^^} || VIRT="UNKNOWN"
 echo -e "VM Type    : $VIRT"
@@ -347,7 +358,7 @@ if [[ -n $JSON ]]; then
 	AES=$([[ "$CPU_AES" = *Enabled* ]] && echo "true" || echo "false")
 	CPU_VIRT_BOOL=$([[ "$CPU_VIRT" = *Enabled* ]] && echo "true" || echo "false")
 	JSON_RESULT='{"version":"'$YABS_VERSION'","time":"'$TIME_START'","os":{"arch":"'$ARCH'","distro":"'$DISTRO'","kernel":"'$KERNEL'",'
-	JSON_RESULT+='"uptime":'$UPTIME_S',"vm":"'$VIRT'"},"net":{"ipv4":'$IPV4',"ipv6":'$IPV6'},"cpu":{"model":"'$CPU_PROC'","cores":'$CPU_CORES','
+	JSON_RESULT+='"uptime":'$UPTIME_S',"vm":"'$VIRT'","hostname":"'$HOSTNAME'","unique_id":"'$UNIQUE_ID'"},"net":{"ipv4":'$IPV4',"ipv6":'$IPV6'},"cpu":{"model":"'$CPU_PROC'","cores":'$CPU_CORES','
 	JSON_RESULT+='"freq":"'$CPU_FREQ'","aes":'$AES',"virt":'$CPU_VIRT_BOOL'},"mem":{"ram":'$TOTAL_RAM_RAW',"ram_units":"KiB","swap":'$TOTAL_SWAP_RAW',"swap_units":"KiB","disk":'$TOTAL_DISK_RAW',"disk_units":"KB"}'
 fi
 
